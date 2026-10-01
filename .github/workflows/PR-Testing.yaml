@@ -50,7 +50,7 @@ jobs:
           server {
               listen 4000;
 
-              server_name _;
+              server_name 13.62.53.160;
 
               root /var/www/cicd-demo;
 
