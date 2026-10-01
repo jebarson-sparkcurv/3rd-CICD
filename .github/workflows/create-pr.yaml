@@ -6,7 +6,7 @@ on:
       - developer
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -14,21 +14,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      - name: Check GitHub authentication
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          gh api user --jq '.login'
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Create Pull Request
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh pr create \
             --base main \
             --head developer \
             --title "Developer → Main" \
-            --body "Automatically created Pull Request from developer branch."
+            --body "Automatically created PR from developer branch."
