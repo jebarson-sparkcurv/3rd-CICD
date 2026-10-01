@@ -1,0 +1,78 @@
+name: Deploy to Testing Server
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "${{ secrets.TEST_SERVER_SSH_KEY }}" > ~/.ssh/github-actions
+
+          chmod 600 ~/.ssh/github-actions
+
+          ssh-keyscan -H "${{ secrets.TEST_SERVER_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy application
+        run: |
+          scp -i ~/.ssh/github-actions \
+            frontpage.html \
+            ${{ secrets.TEST_SERVER_USER }}@${{ secrets.TEST_SERVER_HOST }}:/tmp/frontpage.html
+
+      - name: Configure NGINX and deploy application
+        run: |
+          ssh -i ~/.ssh/github-actions \
+            ${{ secrets.TEST_SERVER_USER }}@${{ secrets.TEST_SERVER_HOST }} << 'EOF'
+
+          sudo mkdir -p /var/www/cicd-demo
+
+          sudo cp /tmp/frontpage.html /var/www/cicd-demo/frontpage.html
+
+          sudo tee /etc/nginx/sites-available/cicd-demo > /dev/null << 'NGINX'
+          server {
+              listen 4000;
+
+              server_name _;
+
+              root /var/www/cicd-demo;
+
+              index frontpage.html;
+
+              location / {
+                  try_files $uri $uri/ =404;
+              }
+          }
+          NGINX
+
+          sudo ln -sf \
+            /etc/nginx/sites-available/cicd-demo \
+            /etc/nginx/sites-enabled/cicd-demo
+
+          sudo nginx -t
+
+          sudo systemctl reload nginx
+
+          EOF
+
+      - name: Verify deployment
+        run: |
+          curl --fail \
+            http://${{ secrets.TEST_SERVER_HOST }}:4000/
